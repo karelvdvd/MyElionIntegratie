@@ -3,20 +3,20 @@
     "step": {
       "user": {
         "title": "Verbind met Elion",
-        "description": "Voer uw Elion API-gegevens in.",
+        "description": "Voer de Elion site ID en access token in. Let op: deze eerste versie gebruikt een tijdelijke access token uit het Elion dashboard.",
         "data": {
-          "username": "Gebruikersnaam",
-          "password": "Wachtwoord"
+          "site_id": "Site ID",
+          "access_token": "Access token"
         }
       }
     },
     "error": {
       "cannot_connect": "Kan geen verbinding maken met Elion.",
-      "invalid_auth": "Ongeldige gebruikersnaam of wachtwoord.",
+      "invalid_auth": "Ongeldige of vervallen access token.",
       "unknown": "Onverwachte fout."
     },
     "abort": {
-      "already_configured": "Deze Elion-account is reeds geconfigureerd."
+      "already_configured": "Deze Elion site is reeds geconfigureerd."
     }
   }
 }

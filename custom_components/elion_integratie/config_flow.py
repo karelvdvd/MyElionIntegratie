@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN
+from .api import ElionApi, ElionApiError, ElionAuthError
+from .const import CONF_ACCESS_TOKEN, CONF_SITE_ID, DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -23,18 +28,41 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            await self.async_set_unique_id(user_input[CONF_USERNAME])
+            site_id = str(user_input[CONF_SITE_ID]).strip()
+            access_token = str(user_input[CONF_ACCESS_TOKEN]).strip()
+
+            await self.async_set_unique_id(site_id)
             self._abort_if_unique_id_configured()
 
-            return self.async_create_entry(
-                title="Elion",
-                data=user_input,
+            session = async_get_clientsession(self.hass)
+            api = ElionApi(
+                session=session,
+                site_id=site_id,
+                access_token=access_token,
             )
+
+            try:
+                await api.async_get_live()
+            except ElionAuthError:
+                errors["base"] = "invalid_auth"
+            except ElionApiError:
+                errors["base"] = "cannot_connect"
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Unexpected error while validating Elion config")
+                errors["base"] = "unknown"
+            else:
+                return self.async_create_entry(
+                    title=f"Elion site {site_id}",
+                    data={
+                        CONF_SITE_ID: site_id,
+                        CONF_ACCESS_TOKEN: access_token,
+                    },
+                )
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_USERNAME): str,
-                vol.Required(CONF_PASSWORD): str,
+                vol.Required(CONF_SITE_ID, default="808"): str,
+                vol.Required(CONF_ACCESS_TOKEN): str,
             }
         )
 
