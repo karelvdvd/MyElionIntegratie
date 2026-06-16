@@ -8,7 +8,7 @@ from typing import Any
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
-from .const import API_BASE_URL
+from .const import API_BASE_URL, METERING_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class ElionApi:
         return await self._async_get(f"/sites/{self._site_id}/live")
 
     async def async_get_metering(self) -> dict[str, Any]:
-        """Get metering data from start of current UTC day until now."""
+        """Get metering data for today."""
         now = datetime.now(timezone.utc)
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -55,11 +55,59 @@ class ElionApi:
         if not isinstance(readings, list):
             raise ElionApiError("Unexpected Elion metering response")
 
+        latest = self._get_latest_valid_reading(readings)
+        totals = self._calculate_day_totals(readings)
+
+        return {
+            "readings": readings,
+            "latest": latest,
+            "totals": totals,
+        }
+
+    @staticmethod
+    def _get_latest_valid_reading(readings: list[Any]) -> dict[str, Any]:
+        """Return latest reading with real data."""
         for reading in reversed(readings):
             if isinstance(reading, dict) and reading.get("soc") is not None:
                 return reading
 
         return {}
+
+    @staticmethod
+    def _calculate_day_totals(readings: list[Any]) -> dict[str, float]:
+        """Calculate daily kWh totals from 15-minute metering values."""
+        fields = {
+            "consumption_today": "consumption",
+            "production_today": "production",
+            "flex_charge_today": "flexCharge",
+            "flex_discharge_today": "flexDischarge",
+            "grid_offtake_today": "gridOfftake",
+            "grid_inject_today": "gridInject",
+        }
+
+        totals: dict[str, float] = {}
+
+        for total_key, source_key in fields.items():
+            total = 0.0
+
+            for reading in readings:
+                if not isinstance(reading, dict):
+                    continue
+
+                value = reading.get(source_key)
+                if value is None:
+                    continue
+
+                try:
+                    total += float(value) * METERING_INTERVAL_HOURS / 1000
+                except (TypeError, ValueError):
+                    continue
+
+            totals[total_key] = total
+
+        totals["grid_inject_today_negative"] = -totals.get("grid_inject_today", 0.0)
+
+        return totals
 
     async def _async_get(self, path: str) -> dict[str, Any]:
         """Execute GET request."""

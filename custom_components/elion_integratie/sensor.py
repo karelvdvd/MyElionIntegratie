@@ -12,7 +12,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfPower
+from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -27,9 +27,12 @@ class ElionSensorEntityDescription(SensorEntityDescription):
 
     value_key: str
     coordinator_key: str
+    data_key: str | None = None
+    scale: float = 1.0
 
 
 SENSOR_DESCRIPTIONS: tuple[ElionSensorEntityDescription, ...] = (
+    # Live data, values already in kW / %
     ElionSensorEntityDescription(
         key="battery_soc",
         value_key="soc",
@@ -75,46 +78,121 @@ SENSOR_DESCRIPTIONS: tuple[ElionSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
     ),
+
+    # Latest 15-minute metering values, raw values are W, convert to kW
     ElionSensorEntityDescription(
         key="flex_charge",
         value_key="flexCharge",
         coordinator_key="metering",
+        data_key="latest",
         name="Flex Charge",
         native_unit_of_measurement=UnitOfPower.KILO_WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
+        scale=0.001,
     ),
     ElionSensorEntityDescription(
         key="flex_discharge",
         value_key="flexDischarge",
         coordinator_key="metering",
+        data_key="latest",
         name="Flex Discharge",
         native_unit_of_measurement=UnitOfPower.KILO_WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
+        scale=0.001,
     ),
     ElionSensorEntityDescription(
         key="grid_offtake",
         value_key="gridOfftake",
         coordinator_key="metering",
+        data_key="latest",
         name="Grid Offtake",
         native_unit_of_measurement=UnitOfPower.KILO_WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
+        scale=0.001,
     ),
     ElionSensorEntityDescription(
         key="grid_inject",
         value_key="gridInject",
         coordinator_key="metering",
+        data_key="latest",
         name="Grid Inject",
         native_unit_of_measurement=UnitOfPower.KILO_WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
+        scale=0.001,
     ),
+
+    # Daily totals from metering list
+    ElionSensorEntityDescription(
+        key="consumption_today",
+        value_key="consumption_today",
+        coordinator_key="metering",
+        data_key="totals",
+        name="Consumption Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+    ),
+    ElionSensorEntityDescription(
+        key="production_today",
+        value_key="production_today",
+        coordinator_key="metering",
+        data_key="totals",
+        name="Production Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+    ),
+    ElionSensorEntityDescription(
+        key="flex_charge_today",
+        value_key="flex_charge_today",
+        coordinator_key="metering",
+        data_key="totals",
+        name="Battery Charge Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+    ),
+    ElionSensorEntityDescription(
+        key="flex_discharge_today",
+        value_key="flex_discharge_today",
+        coordinator_key="metering",
+        data_key="totals",
+        name="Battery Discharge Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+    ),
+    ElionSensorEntityDescription(
+        key="grid_offtake_today",
+        value_key="grid_offtake_today",
+        coordinator_key="metering",
+        data_key="totals",
+        name="Grid Offtake Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+    ),
+    ElionSensorEntityDescription(
+        key="grid_inject_today",
+        value_key="grid_inject_today_negative",
+        coordinator_key="metering",
+        data_key="totals",
+        name="Grid Inject Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+    ),
+
+    # Prices / financial latest values
     ElionSensorEntityDescription(
         key="epex_price",
         value_key="epex",
         coordinator_key="metering",
+        data_key="latest",
         name="EPEX Price",
         native_unit_of_measurement="€/MWh",
         state_class=SensorStateClass.MEASUREMENT,
@@ -123,6 +201,7 @@ SENSOR_DESCRIPTIONS: tuple[ElionSensorEntityDescription, ...] = (
         key="imbalance_price",
         value_key="imbPrice",
         coordinator_key="metering",
+        data_key="latest",
         name="Imbalance Price",
         native_unit_of_measurement="€/MWh",
         state_class=SensorStateClass.MEASUREMENT,
@@ -131,6 +210,7 @@ SENSOR_DESCRIPTIONS: tuple[ElionSensorEntityDescription, ...] = (
         key="cost_no_elion",
         value_key="costNoElion",
         coordinator_key="metering",
+        data_key="latest",
         name="Cost No Elion",
         native_unit_of_measurement="€",
         state_class=SensorStateClass.TOTAL,
@@ -139,6 +219,7 @@ SENSOR_DESCRIPTIONS: tuple[ElionSensorEntityDescription, ...] = (
         key="cost_elion",
         value_key="costElion",
         coordinator_key="metering",
+        data_key="latest",
         name="Cost Elion",
         native_unit_of_measurement="€",
         state_class=SensorStateClass.TOTAL,
@@ -147,6 +228,7 @@ SENSOR_DESCRIPTIONS: tuple[ElionSensorEntityDescription, ...] = (
         key="profit_elion",
         value_key="profitElion",
         coordinator_key="metering",
+        data_key="latest",
         name="Profit Elion",
         native_unit_of_measurement="€",
         state_class=SensorStateClass.TOTAL,
@@ -162,18 +244,14 @@ async def async_setup_entry(
     """Set up Elion sensors from a config entry."""
     coordinators = hass.data[DOMAIN][entry.entry_id]
 
-    entities = []
-
-    for description in SENSOR_DESCRIPTIONS:
-        entities.append(
-            ElionSensor(
-                coordinator=coordinators[description.coordinator_key],
-                entry=entry,
-                description=description,
-            )
+    async_add_entities(
+        ElionSensor(
+            coordinator=coordinators[description.coordinator_key],
+            entry=entry,
+            description=description,
         )
-
-    async_add_entities(entities)
+        for description in SENSOR_DESCRIPTIONS
+    )
 
 
 class ElionSensor(CoordinatorEntity[DataUpdateCoordinator], SensorEntity):
@@ -205,12 +283,20 @@ class ElionSensor(CoordinatorEntity[DataUpdateCoordinator], SensorEntity):
     @property
     def native_value(self) -> Any:
         """Return the sensor value."""
-        value = self.coordinator.data.get(self.entity_description.value_key)
+        data = self.coordinator.data
+
+        if self.entity_description.data_key:
+            data = data.get(self.entity_description.data_key, {})
+
+        if not isinstance(data, dict):
+            return None
+
+        value = data.get(self.entity_description.value_key)
 
         if value is None:
             return None
 
         try:
-            return round(float(value), 3)
+            return round(float(value) * self.entity_description.scale, 3)
         except (TypeError, ValueError):
             return value
