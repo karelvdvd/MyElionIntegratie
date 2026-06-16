@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
@@ -36,7 +37,33 @@ class ElionApi:
 
     async def async_get_live(self) -> dict[str, Any]:
         """Get live site data."""
-        url = f"{API_BASE_URL}/sites/{self._site_id}/live"
+        return await self._async_get(f"/sites/{self._site_id}/live")
+
+    async def async_get_metering(self) -> dict[str, Any]:
+        """Get metering data from start of current UTC day until now."""
+        now = datetime.now(timezone.utc)
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        fromts = int(start_of_day.timestamp())
+        tots = int(now.timestamp())
+
+        data = await self._async_get(
+            f"/sites/{self._site_id}/metering?fromts={fromts}&tots={tots}"
+        )
+
+        readings = data.get("readings", [])
+        if not isinstance(readings, list):
+            raise ElionApiError("Unexpected Elion metering response")
+
+        for reading in reversed(readings):
+            if isinstance(reading, dict) and reading.get("soc") is not None:
+                return reading
+
+        return {}
+
+    async def _async_get(self, path: str) -> dict[str, Any]:
+        """Execute GET request."""
+        url = f"{API_BASE_URL}{path}"
 
         headers = {
             "Authorization": f"Bearer {self._access_token}",

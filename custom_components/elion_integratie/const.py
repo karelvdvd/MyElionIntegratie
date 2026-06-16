@@ -12,6 +12,7 @@ CONF_ACCESS_TOKEN = "access_token"
 
 API_BASE_URL = "https://dashboard.elion.be/api"
 
-DEFAULT_SCAN_INTERVAL = 5
+LIVE_SCAN_INTERVAL = 5
+METERING_SCAN_INTERVAL = 60
 
 PLATFORMS = [Platform.SENSOR]
