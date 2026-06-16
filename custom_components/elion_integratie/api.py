@@ -102,10 +102,10 @@ class ElionApi:
 
             consumption = cls._safe_float(reading.get("consumption"))
             production = cls._safe_float(reading.get("production"))
-            grid_offtake = cls._safe_float(reading.get("gridOfftake"))
-            grid_inject = cls._safe_float(reading.get("gridInject"))
             flex_charge = cls._safe_float(reading.get("flexCharge"))
             flex_discharge = cls._safe_float(reading.get("flexDischarge"))
+            grid_offtake = cls._safe_float(reading.get("gridOfftake"))
+            grid_inject = cls._safe_float(reading.get("gridInject"))
 
             if consumption is not None:
                 totals["consumption_today"] += (
@@ -117,6 +117,16 @@ class ElionApi:
                     production * METERING_INTERVAL_HOURS / 1000
                 )
 
+            if flex_charge is not None:
+                totals["flex_charge_today"] += (
+                    flex_charge * METERING_INTERVAL_HOURS / 1000
+                )
+
+            if flex_discharge is not None:
+                totals["flex_discharge_today"] += (
+                    flex_discharge * METERING_INTERVAL_HOURS / 1000
+                )
+
             if grid_offtake is not None:
                 totals["grid_offtake_today"] += (
                     grid_offtake * METERING_INTERVAL_HOURS / 1000
@@ -126,23 +136,6 @@ class ElionApi:
                 totals["grid_inject_today"] += (
                     grid_inject * METERING_INTERVAL_HOURS / 1000
                 )
-
-            # Elion dashboard uses:
-            # battery_action = flexCharge - flexDischarge
-            #
-            # Positive = battery charging
-            # Negative = battery discharging
-            if flex_charge is not None and flex_discharge is not None:
-                battery_action = flex_charge - flex_discharge
-
-                if battery_action > 0:
-                    totals["flex_charge_today"] += (
-                        battery_action * METERING_INTERVAL_HOURS / 1000
-                    )
-                elif battery_action < 0:
-                    totals["flex_discharge_today"] += (
-                        abs(battery_action) * METERING_INTERVAL_HOURS / 1000
-                    )
 
         totals["grid_inject_today_negative"] = -totals["grid_inject_today"]
 
