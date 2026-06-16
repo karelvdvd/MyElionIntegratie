@@ -89,7 +89,7 @@ class ElionApi:
 
     @classmethod
     def _calculate_day_totals(cls, readings: list[Any]) -> dict[str, float]:
-        """Calculate daily kWh totals from 15-minute metering values."""
+        """Calculate daily kWh totals exactly like the Elion dashboard."""
         totals: dict[str, float] = {
             "consumption_today": 0.0,
             "production_today": 0.0,
@@ -105,7 +105,7 @@ class ElionApi:
                 continue
 
             consumption = cls._safe_float(reading.get("consumption"))
-            production = cls._safe_float(reading.get("production"))
+            production = cls._safe_float(reading.get("uncurtailedProduction"))
             curtailed_production = cls._safe_float(reading.get("curtailedProduction"))
             flex_charge = cls._safe_float(reading.get("flexCharge"))
             flex_discharge = cls._safe_float(reading.get("flexDischarge"))
