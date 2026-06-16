@@ -74,38 +74,77 @@ class ElionApi:
         return {}
 
     @staticmethod
-    def _calculate_day_totals(readings: list[Any]) -> dict[str, float]:
+    def _safe_float(value: Any) -> float | None:
+        """Convert a value to float safely."""
+        if value is None:
+            return None
+
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _calculate_day_totals(cls, readings: list[Any]) -> dict[str, float]:
         """Calculate daily kWh totals from 15-minute metering values."""
-        fields = {
-            "consumption_today": "consumption",
-            "production_today": "production",
-            "flex_charge_today": "flexCharge",
-            "flex_discharge_today": "flexDischarge",
-            "grid_offtake_today": "gridOfftake",
-            "grid_inject_today": "gridInject",
+        totals: dict[str, float] = {
+            "consumption_today": 0.0,
+            "production_today": 0.0,
+            "flex_charge_today": 0.0,
+            "flex_discharge_today": 0.0,
+            "grid_offtake_today": 0.0,
+            "grid_inject_today": 0.0,
         }
 
-        totals: dict[str, float] = {}
+        for reading in readings:
+            if not isinstance(reading, dict):
+                continue
 
-        for total_key, source_key in fields.items():
-            total = 0.0
+            consumption = cls._safe_float(reading.get("consumption"))
+            production = cls._safe_float(reading.get("production"))
+            grid_offtake = cls._safe_float(reading.get("gridOfftake"))
+            grid_inject = cls._safe_float(reading.get("gridInject"))
+            flex_charge = cls._safe_float(reading.get("flexCharge"))
+            flex_discharge = cls._safe_float(reading.get("flexDischarge"))
 
-            for reading in readings:
-                if not isinstance(reading, dict):
-                    continue
+            if consumption is not None:
+                totals["consumption_today"] += (
+                    consumption * METERING_INTERVAL_HOURS / 1000
+                )
 
-                value = reading.get(source_key)
-                if value is None:
-                    continue
+            if production is not None:
+                totals["production_today"] += (
+                    production * METERING_INTERVAL_HOURS / 1000
+                )
 
-                try:
-                    total += float(value) * METERING_INTERVAL_HOURS / 1000
-                except (TypeError, ValueError):
-                    continue
+            if grid_offtake is not None:
+                totals["grid_offtake_today"] += (
+                    grid_offtake * METERING_INTERVAL_HOURS / 1000
+                )
 
-            totals[total_key] = total
+            if grid_inject is not None:
+                totals["grid_inject_today"] += (
+                    grid_inject * METERING_INTERVAL_HOURS / 1000
+                )
 
-        totals["grid_inject_today_negative"] = -totals.get("grid_inject_today", 0.0)
+            # Elion dashboard uses:
+            # battery_action = flexCharge - flexDischarge
+            #
+            # Positive = battery charging
+            # Negative = battery discharging
+            if flex_charge is not None and flex_discharge is not None:
+                battery_action = flex_charge - flex_discharge
+
+                if battery_action > 0:
+                    totals["flex_charge_today"] += (
+                        battery_action * METERING_INTERVAL_HOURS / 1000
+                    )
+                elif battery_action < 0:
+                    totals["flex_discharge_today"] += (
+                        abs(battery_action) * METERING_INTERVAL_HOURS / 1000
+                    )
+
+        totals["grid_inject_today_negative"] = -totals["grid_inject_today"]
 
         return totals
 
