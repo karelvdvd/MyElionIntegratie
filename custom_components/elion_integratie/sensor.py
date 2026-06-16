@@ -233,6 +233,16 @@ SENSOR_DESCRIPTIONS: tuple[ElionSensorEntityDescription, ...] = (
         native_unit_of_measurement="€",
         state_class=SensorStateClass.TOTAL,
     ),
+    ElionSensorEntityDescription(
+        key="today_curtailed_production",
+        value_key="curtailed_production_today",
+        coordinator_key="metering",
+        data_key="totals",
+        name="Today Curtailed Production",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+    ),
 )
 
 

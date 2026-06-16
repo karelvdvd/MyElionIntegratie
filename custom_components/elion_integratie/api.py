@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
-from .const import API_BASE_URL, METERING_INTERVAL_HOURS
+from .const import API_BASE_URL, LOCAL_TIMEZONE, METERING_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,8 +41,10 @@ class ElionApi:
         return await self._async_get(f"/sites/{self._site_id}/live")
 
     async def async_get_metering(self) -> dict[str, Any]:
-        """Get metering data for today."""
-        now = datetime.now(timezone.utc)
+        """Get metering data for the current local day."""
+        local_tz = ZoneInfo(LOCAL_TIMEZONE)
+
+        now = datetime.now(local_tz)
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
         fromts = int(start_of_day.timestamp())
@@ -90,6 +93,7 @@ class ElionApi:
         totals: dict[str, float] = {
             "consumption_today": 0.0,
             "production_today": 0.0,
+            "curtailed_production_today": 0.0,
             "flex_charge_today": 0.0,
             "flex_discharge_today": 0.0,
             "grid_offtake_today": 0.0,
@@ -101,7 +105,11 @@ class ElionApi:
                 continue
 
             consumption = cls._safe_float(reading.get("consumption"))
-            production = cls._safe_float(reading.get("production"))
+
+            # Elion dashboard uses uncurtailedProduction for "Productie - Effectief"
+            production = cls._safe_float(reading.get("uncurtailedProduction"))
+            curtailed_production = cls._safe_float(reading.get("curtailedProduction"))
+
             flex_charge = cls._safe_float(reading.get("flexCharge"))
             flex_discharge = cls._safe_float(reading.get("flexDischarge"))
             grid_offtake = cls._safe_float(reading.get("gridOfftake"))
@@ -115,6 +123,11 @@ class ElionApi:
             if production is not None:
                 totals["production_today"] += (
                     production * METERING_INTERVAL_HOURS / 1000
+                )
+
+            if curtailed_production is not None:
+                totals["curtailed_production_today"] += (
+                    curtailed_production * METERING_INTERVAL_HOURS / 1000
                 )
 
             if flex_charge is not None:
