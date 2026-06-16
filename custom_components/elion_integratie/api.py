@@ -105,11 +105,8 @@ class ElionApi:
                 continue
 
             consumption = cls._safe_float(reading.get("consumption"))
-
-            # Elion dashboard uses uncurtailedProduction for "Productie - Effectief"
-            production = cls._safe_float(reading.get("uncurtailedProduction"))
+            production = cls._safe_float(reading.get("production"))
             curtailed_production = cls._safe_float(reading.get("curtailedProduction"))
-
             flex_charge = cls._safe_float(reading.get("flexCharge"))
             flex_discharge = cls._safe_float(reading.get("flexDischarge"))
             grid_offtake = cls._safe_float(reading.get("gridOfftake"))
