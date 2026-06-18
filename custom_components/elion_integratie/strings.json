@@ -3,16 +3,20 @@
     "step": {
       "user": {
         "title": "Verbind met Elion",
-        "description": "Voer de Elion site ID en access token in. Let op: deze eerste versie gebruikt een tijdelijke access token uit het Elion dashboard.",
+        "description": "Voer de Elion site ID en OAuth refresh gegevens in. De access token is optioneel; met refresh token kan de integratie zelf een nieuwe access token ophalen.",
         "data": {
           "site_id": "Site ID",
-          "access_token": "Access token"
+          "token_url": "Token URL",
+          "client_id": "Client ID",
+          "refresh_token": "Refresh token",
+          "redirect_uri": "Redirect URI",
+          "access_token": "Access token optioneel"
         }
       }
     },
     "error": {
       "cannot_connect": "Kan geen verbinding maken met Elion.",
-      "invalid_auth": "Ongeldige of vervallen access token.",
+      "invalid_auth": "Ongeldige OAuth gegevens of refresh token.",
       "unknown": "Onverwachte fout."
     },
     "abort": {

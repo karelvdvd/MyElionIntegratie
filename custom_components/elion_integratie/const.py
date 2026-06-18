@@ -9,6 +9,10 @@ MANUFACTURER = "Elion"
 
 CONF_SITE_ID = "site_id"
 CONF_ACCESS_TOKEN = "access_token"
+CONF_REFRESH_TOKEN = "refresh_token"
+CONF_CLIENT_ID = "client_id"
+CONF_TOKEN_URL = "token_url"
+CONF_REDIRECT_URI = "redirect_uri"
 
 API_BASE_URL = "https://dashboard.elion.be/api"
 

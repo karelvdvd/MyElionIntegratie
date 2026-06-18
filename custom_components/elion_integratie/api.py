@@ -29,12 +29,20 @@ class ElionApi:
         self,
         session: ClientSession,
         site_id: str,
-        access_token: str,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+        client_id: str | None = None,
+        token_url: str | None = None,
+        redirect_uri: str | None = None,
     ) -> None:
         """Initialize the API client."""
         self._session = session
         self._site_id = site_id
         self._access_token = access_token
+        self._refresh_token = refresh_token
+        self._client_id = client_id
+        self._token_url = token_url
+        self._redirect_uri = redirect_uri
 
     async def async_get_live(self) -> dict[str, Any]:
         """Get live site data."""
@@ -66,6 +74,105 @@ class ElionApi:
             "latest": latest,
             "totals": totals,
         }
+
+    async def async_refresh_access_token(self) -> str:
+        """Refresh the Salesforce/Elindus access token."""
+        if not self._token_url or not self._client_id or not self._refresh_token:
+            raise ElionAuthError("Missing refresh token configuration")
+
+        payload = {
+            "grant_type": "refresh_token",
+            "client_id": self._client_id,
+            "refresh_token": self._refresh_token,
+        }
+
+        if self._redirect_uri:
+            payload["redirect_uri"] = self._redirect_uri
+
+        try:
+            async with self._session.post(
+                self._token_url,
+                data=payload,
+                timeout=30,
+            ) as response:
+                text = await response.text()
+
+                if response.status in (400, 401, 403):
+                    _LOGGER.warning("Elion token refresh failed: %s", text)
+                    raise ElionAuthError("Could not refresh Elion access token")
+
+                response.raise_for_status()
+
+                try:
+                    data = await response.json()
+                except Exception as err:  # noqa: BLE001
+                    raise ElionAuthError("Invalid token refresh response") from err
+
+        except ElionAuthError:
+            raise
+        except ClientResponseError as err:
+            raise ElionApiError(f"Elion token endpoint returned HTTP {err.status}") from err
+        except ClientError as err:
+            raise ElionApiError("Cannot connect to Elion token endpoint") from err
+
+        access_token = data.get("access_token")
+        if not access_token:
+            raise ElionAuthError("Token refresh response did not contain access_token")
+
+        self._access_token = str(access_token)
+        _LOGGER.debug("Elion access token refreshed")
+
+        return self._access_token
+
+    async def _async_get(self, path: str) -> dict[str, Any]:
+        """Execute GET request with one automatic token refresh."""
+        if not self._access_token:
+            await self.async_refresh_access_token()
+
+        try:
+            return await self._async_get_once(path)
+        except ElionAuthError:
+            if not self._refresh_token:
+                raise
+
+            _LOGGER.info("Elion access token invalid or expired, refreshing")
+            await self.async_refresh_access_token()
+            return await self._async_get_once(path)
+
+    async def _async_get_once(self, path: str) -> dict[str, Any]:
+        """Execute one GET request."""
+        url = f"{API_BASE_URL}{path}"
+
+        headers = {
+            "Authorization": f"Bearer {self._access_token}",
+            "Accept": "application/json, text/plain, */*",
+        }
+
+        try:
+            async with self._session.get(
+                url,
+                headers=headers,
+                timeout=30,
+            ) as response:
+                if response.status in (401, 403):
+                    text = await response.text()
+                    _LOGGER.warning("Elion authentication failed: %s", text)
+                    raise ElionAuthError("Invalid or expired Elion access token")
+
+                response.raise_for_status()
+                data = await response.json()
+
+        except ElionAuthError:
+            raise
+        except ClientResponseError as err:
+            raise ElionApiError(f"Elion API returned HTTP {err.status}") from err
+        except ClientError as err:
+            raise ElionApiError("Cannot connect to Elion API") from err
+
+        if not isinstance(data, dict):
+            raise ElionApiError("Unexpected Elion API response")
+
+        return data
 
     @staticmethod
     def _get_latest_valid_reading(readings: list[Any]) -> dict[str, Any]:
@@ -150,38 +257,3 @@ class ElionApi:
         totals["grid_inject_today_negative"] = -totals["grid_inject_today"]
 
         return totals
-
-    async def _async_get(self, path: str) -> dict[str, Any]:
-        """Execute GET request."""
-        url = f"{API_BASE_URL}{path}"
-
-        headers = {
-            "Authorization": f"Bearer {self._access_token}",
-            "Accept": "application/json, text/plain, */*",
-        }
-
-        try:
-            async with self._session.get(
-                url,
-                headers=headers,
-                timeout=30,
-            ) as response:
-                if response.status in (401, 403):
-                    text = await response.text()
-                    _LOGGER.warning("Elion authentication failed: %s", text)
-                    raise ElionAuthError("Invalid or expired Elion access token")
-
-                response.raise_for_status()
-                data = await response.json()
-
-        except ElionAuthError:
-            raise
-        except ClientResponseError as err:
-            raise ElionApiError(f"Elion API returned HTTP {err.status}") from err
-        except ClientError as err:
-            raise ElionApiError("Cannot connect to Elion API") from err
-
-        if not isinstance(data, dict):
-            raise ElionApiError("Unexpected Elion API response")
-
-        return data

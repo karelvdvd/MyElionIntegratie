@@ -7,7 +7,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import ElionApi
-from .const import CONF_ACCESS_TOKEN, CONF_SITE_ID, DOMAIN, PLATFORMS
+from .const import (
+    CONF_ACCESS_TOKEN,
+    CONF_CLIENT_ID,
+    CONF_REDIRECT_URI,
+    CONF_REFRESH_TOKEN,
+    CONF_SITE_ID,
+    CONF_TOKEN_URL,
+    DOMAIN,
+    PLATFORMS,
+)
 from .coordinator import ElionLiveCoordinator, ElionMeteringCoordinator
 
 
@@ -23,7 +32,11 @@ async def async_setup_entry(
     api = ElionApi(
         session=session,
         site_id=entry.data[CONF_SITE_ID],
-        access_token=entry.data[CONF_ACCESS_TOKEN],
+        access_token=entry.data.get(CONF_ACCESS_TOKEN) or None,
+        refresh_token=entry.data.get(CONF_REFRESH_TOKEN) or None,
+        client_id=entry.data.get(CONF_CLIENT_ID) or None,
+        token_url=entry.data.get(CONF_TOKEN_URL) or None,
+        redirect_uri=entry.data.get(CONF_REDIRECT_URI) or None,
     )
 
     live_coordinator = ElionLiveCoordinator(
