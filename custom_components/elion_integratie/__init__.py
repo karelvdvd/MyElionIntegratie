@@ -29,6 +29,22 @@ async def async_setup_entry(
 
     session = async_get_clientsession(hass)
 
+    def _async_save_tokens(
+        access_token: str,
+        refresh_token: str | None,
+    ) -> None:
+        """Save refreshed tokens back to the config entry."""
+        new_data = dict(entry.data)
+        new_data[CONF_ACCESS_TOKEN] = access_token
+
+        if refresh_token:
+            new_data[CONF_REFRESH_TOKEN] = refresh_token
+
+        hass.config_entries.async_update_entry(
+            entry,
+            data=new_data,
+        )
+
     api = ElionApi(
         session=session,
         site_id=entry.data[CONF_SITE_ID],
@@ -37,6 +53,7 @@ async def async_setup_entry(
         client_id=entry.data.get(CONF_CLIENT_ID) or None,
         token_url=entry.data.get(CONF_TOKEN_URL) or None,
         redirect_uri=entry.data.get(CONF_REDIRECT_URI) or None,
+        token_update_callback=_async_save_tokens,
     )
 
     live_coordinator = ElionLiveCoordinator(

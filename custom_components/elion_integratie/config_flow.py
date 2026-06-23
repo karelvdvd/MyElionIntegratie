@@ -71,8 +71,8 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title=f"Elion site {site_id}",
                     data={
                         CONF_SITE_ID: site_id,
-                        CONF_ACCESS_TOKEN: access_token or "",
-                        CONF_REFRESH_TOKEN: refresh_token,
+                        CONF_ACCESS_TOKEN: api.access_token or access_token or "",
+                        CONF_REFRESH_TOKEN: api.refresh_token or refresh_token,
                         CONF_CLIENT_ID: client_id,
                         CONF_TOKEN_URL: token_url,
                         CONF_REDIRECT_URI: redirect_uri or "",
@@ -85,7 +85,10 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_TOKEN_URL): str,
                 vol.Required(CONF_CLIENT_ID): str,
                 vol.Required(CONF_REFRESH_TOKEN): str,
-                vol.Optional(CONF_REDIRECT_URI, default="https://dashboard.elion.be"): str,
+                vol.Optional(
+                    CONF_REDIRECT_URI,
+                    default="https://dashboard.elion.be",
+                ): str,
                 vol.Optional(CONF_ACCESS_TOKEN): str,
             }
         )

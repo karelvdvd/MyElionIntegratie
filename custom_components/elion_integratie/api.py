@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 from datetime import datetime
 from typing import Any
@@ -12,6 +13,8 @@ from aiohttp import ClientError, ClientResponseError, ClientSession
 from .const import API_BASE_URL, LOCAL_TIMEZONE, METERING_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
+
+TokenUpdateCallback = Callable[[str, str | None], None]
 
 
 class ElionApiError(Exception):
@@ -34,6 +37,7 @@ class ElionApi:
         client_id: str | None = None,
         token_url: str | None = None,
         redirect_uri: str | None = None,
+        token_update_callback: TokenUpdateCallback | None = None,
     ) -> None:
         """Initialize the API client."""
         self._session = session
@@ -43,6 +47,17 @@ class ElionApi:
         self._client_id = client_id
         self._token_url = token_url
         self._redirect_uri = redirect_uri
+        self._token_update_callback = token_update_callback
+
+    @property
+    def access_token(self) -> str | None:
+        """Return current access token."""
+        return self._access_token
+
+    @property
+    def refresh_token(self) -> str | None:
+        """Return current refresh token."""
+        return self._refresh_token
 
     async def async_get_live(self) -> dict[str, Any]:
         """Get live site data."""
@@ -119,8 +134,18 @@ class ElionApi:
         if not access_token:
             raise ElionAuthError("Token refresh response did not contain access_token")
 
+        refresh_token = data.get("refresh_token")
+
         self._access_token = str(access_token)
-        _LOGGER.debug("Elion access token refreshed")
+
+        if refresh_token:
+            self._refresh_token = str(refresh_token)
+            _LOGGER.info("Elion access token and refresh token refreshed")
+        else:
+            _LOGGER.info("Elion access token refreshed, refresh token unchanged")
+
+        if self._token_update_callback:
+            self._token_update_callback(self._access_token, self._refresh_token)
 
         return self._access_token
 
