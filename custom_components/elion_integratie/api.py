@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 import logging
 from datetime import datetime
@@ -48,6 +49,7 @@ class ElionApi:
         self._token_url = token_url
         self._redirect_uri = redirect_uri
         self._token_update_callback = token_update_callback
+        self._token_refresh_lock = asyncio.Lock()
 
     @property
     def access_token(self) -> str | None:
@@ -92,62 +94,68 @@ class ElionApi:
 
     async def async_refresh_access_token(self) -> str:
         """Refresh the Salesforce/Elindus access token."""
-        if not self._token_url or not self._client_id or not self._refresh_token:
-            raise ElionAuthError("Missing refresh token configuration")
+        async with self._token_refresh_lock:
+            if not self._token_url or not self._client_id or not self._refresh_token:
+                raise ElionAuthError("Missing refresh token configuration")
 
-        payload = {
-            "grant_type": "refresh_token",
-            "client_id": self._client_id,
-            "refresh_token": self._refresh_token,
-        }
+            payload = {
+                "grant_type": "refresh_token",
+                "client_id": self._client_id,
+                "refresh_token": self._refresh_token,
+            }
 
-        if self._redirect_uri:
-            payload["redirect_uri"] = self._redirect_uri
+            try:
+                async with self._session.post(
+                    self._token_url,
+                    data=payload,
+                    headers={
+                        "Accept": "application/json",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    timeout=30,
+                ) as response:
+                    text = await response.text()
 
-        try:
-            async with self._session.post(
-                self._token_url,
-                data=payload,
-                timeout=30,
-            ) as response:
-                text = await response.text()
+                    if response.status in (400, 401, 403):
+                        _LOGGER.warning("Elion token refresh failed: %s", text)
+                        raise ElionAuthError("Could not refresh Elion access token")
 
-                if response.status in (400, 401, 403):
-                    _LOGGER.warning("Elion token refresh failed: %s", text)
-                    raise ElionAuthError("Could not refresh Elion access token")
+                    response.raise_for_status()
 
-                response.raise_for_status()
+                    try:
+                        data = await response.json()
+                    except Exception as err:  # noqa: BLE001
+                        raise ElionAuthError("Invalid token refresh response") from err
 
-                try:
-                    data = await response.json()
-                except Exception as err:  # noqa: BLE001
-                    raise ElionAuthError("Invalid token refresh response") from err
+            except ElionAuthError:
+                raise
+            except ClientResponseError as err:
+                raise ElionApiError(
+                    f"Elion token endpoint returned HTTP {err.status}"
+                ) from err
+            except ClientError as err:
+                raise ElionApiError("Cannot connect to Elion token endpoint") from err
 
-        except ElionAuthError:
-            raise
-        except ClientResponseError as err:
-            raise ElionApiError(f"Elion token endpoint returned HTTP {err.status}") from err
-        except ClientError as err:
-            raise ElionApiError("Cannot connect to Elion token endpoint") from err
+            access_token = data.get("access_token")
+            if not access_token:
+                raise ElionAuthError(
+                    "Token refresh response did not contain access_token"
+                )
 
-        access_token = data.get("access_token")
-        if not access_token:
-            raise ElionAuthError("Token refresh response did not contain access_token")
+            refresh_token = data.get("refresh_token")
 
-        refresh_token = data.get("refresh_token")
+            self._access_token = str(access_token)
 
-        self._access_token = str(access_token)
+            if refresh_token:
+                self._refresh_token = str(refresh_token)
+                _LOGGER.info("Elion access token and refresh token refreshed")
+            else:
+                _LOGGER.info("Elion access token refreshed, refresh token unchanged")
 
-        if refresh_token:
-            self._refresh_token = str(refresh_token)
-            _LOGGER.info("Elion access token and refresh token refreshed")
-        else:
-            _LOGGER.info("Elion access token refreshed, refresh token unchanged")
+            if self._token_update_callback:
+                self._token_update_callback(self._access_token, self._refresh_token)
 
-        if self._token_update_callback:
-            self._token_update_callback(self._access_token, self._refresh_token)
-
-        return self._access_token
+            return self._access_token
 
     async def _async_get(self, path: str) -> dict[str, Any]:
         """Execute GET request with one automatic token refresh."""

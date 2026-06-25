@@ -19,6 +19,10 @@ API_BASE_URL = "https://dashboard.elion.be/api"
 LIVE_SCAN_INTERVAL = 5
 METERING_SCAN_INTERVAL = 60
 
+# Refresh ruim vóór de access token vervalt.
+# Salesforce/Elindus lijkt te falen als we wachten tot "Invalid token".
+TOKEN_REFRESH_INTERVAL = 55 * 60
+
 METERING_INTERVAL_HOURS = 0.25
 LOCAL_TIMEZONE = "Europe/Brussels"
 
