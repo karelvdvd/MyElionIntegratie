@@ -11,6 +11,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import ElionApi, ElionApiError, ElionAuthError
 from .const import (
+    CLIENT_ID,
     CONF_ACCESS_TOKEN,
     CONF_CLIENT_ID,
     CONF_REDIRECT_URI,
@@ -18,6 +19,8 @@ from .const import (
     CONF_SITE_ID,
     CONF_TOKEN_URL,
     DOMAIN,
+    REDIRECT_URI,
+    TOKEN_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,9 +42,6 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             site_id = str(user_input[CONF_SITE_ID]).strip()
             access_token = str(user_input.get(CONF_ACCESS_TOKEN, "")).strip() or None
             refresh_token = str(user_input[CONF_REFRESH_TOKEN]).strip()
-            client_id = str(user_input[CONF_CLIENT_ID]).strip()
-            token_url = str(user_input[CONF_TOKEN_URL]).strip()
-            redirect_uri = str(user_input.get(CONF_REDIRECT_URI, "")).strip() or None
 
             await self.async_set_unique_id(site_id)
             self._abort_if_unique_id_configured()
@@ -52,9 +52,9 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 site_id=site_id,
                 access_token=access_token,
                 refresh_token=refresh_token,
-                client_id=client_id,
-                token_url=token_url,
-                redirect_uri=redirect_uri,
+                client_id=CLIENT_ID,
+                token_url=TOKEN_URL,
+                redirect_uri=REDIRECT_URI,
             )
 
             try:
@@ -73,22 +73,16 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SITE_ID: site_id,
                         CONF_ACCESS_TOKEN: api.access_token or access_token or "",
                         CONF_REFRESH_TOKEN: api.refresh_token or refresh_token,
-                        CONF_CLIENT_ID: client_id,
-                        CONF_TOKEN_URL: token_url,
-                        CONF_REDIRECT_URI: redirect_uri or "",
+                        CONF_CLIENT_ID: CLIENT_ID,
+                        CONF_TOKEN_URL: TOKEN_URL,
+                        CONF_REDIRECT_URI: REDIRECT_URI,
                     },
                 )
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_SITE_ID, default="808"): str,
-                vol.Required(CONF_TOKEN_URL): str,
-                vol.Required(CONF_CLIENT_ID): str,
+                vol.Required(CONF_SITE_ID): str,
                 vol.Required(CONF_REFRESH_TOKEN): str,
-                vol.Optional(
-                    CONF_REDIRECT_URI,
-                    default="https://dashboard.elion.be",
-                ): str,
                 vol.Optional(CONF_ACCESS_TOKEN): str,
             }
         )
@@ -124,9 +118,9 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 site_id=reauth_entry.data[CONF_SITE_ID],
                 access_token=access_token,
                 refresh_token=refresh_token,
-                client_id=reauth_entry.data[CONF_CLIENT_ID],
-                token_url=reauth_entry.data[CONF_TOKEN_URL],
-                redirect_uri=reauth_entry.data.get(CONF_REDIRECT_URI) or None,
+                client_id=CLIENT_ID,
+                token_url=TOKEN_URL,
+                redirect_uri=REDIRECT_URI,
             )
 
             try:
@@ -144,6 +138,9 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data_updates={
                         CONF_ACCESS_TOKEN: api.access_token or access_token or "",
                         CONF_REFRESH_TOKEN: api.refresh_token or refresh_token,
+                        CONF_CLIENT_ID: CLIENT_ID,
+                        CONF_TOKEN_URL: TOKEN_URL,
+                        CONF_REDIRECT_URI: REDIRECT_URI,
                     },
                 )
 

@@ -125,6 +125,9 @@ class ElionApi:
                     try:
                         data = await response.json()
                     except Exception as err:  # noqa: BLE001
+                        _LOGGER.warning(
+                            "Elion token refresh returned invalid JSON: %s", text
+                        )
                         raise ElionAuthError("Invalid token refresh response") from err
 
             except ElionAuthError:
@@ -138,6 +141,9 @@ class ElionApi:
 
             access_token = data.get("access_token")
             if not access_token:
+                _LOGGER.warning(
+                    "Elion token refresh response missing access_token: %s", text
+                )
                 raise ElionAuthError(
                     "Token refresh response did not contain access_token"
                 )

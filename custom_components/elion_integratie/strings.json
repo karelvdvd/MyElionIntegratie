@@ -3,13 +3,10 @@
     "step": {
       "user": {
         "title": "Verbind met Elion",
-        "description": "Voer de Elion site ID en OAuth refresh gegevens in. De access token is optioneel; met refresh token kan de integratie zelf een nieuwe access token ophalen.",
+        "description": "Voer je Elion site ID en refresh token in. Je vindt de refresh token via DevTools → Application → Local Storage → ROCP_refreshToken op dashboard.elion.be. De access token is optioneel; met de refresh token kan de integratie zelf een nieuwe access token ophalen.",
         "data": {
           "site_id": "Site ID",
-          "token_url": "Token URL",
-          "client_id": "Client ID",
           "refresh_token": "Refresh token",
-          "redirect_uri": "Redirect URI",
           "access_token": "Access token optioneel"
         }
       },
