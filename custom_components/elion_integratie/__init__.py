@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
 
-from .api import ElionApi, ElionApiError
+from .api import ElionApi, ElionApiError, ElionAuthError
 from .const import (
     CONF_ACCESS_TOKEN,
     CONF_CLIENT_ID,
@@ -65,11 +65,13 @@ async def async_setup_entry(
 
     live_coordinator = ElionLiveCoordinator(
         hass=hass,
+        config_entry=entry,
         api=api,
     )
 
     metering_coordinator = ElionMeteringCoordinator(
         hass=hass,
+        config_entry=entry,
         api=api,
     )
 
@@ -80,6 +82,13 @@ async def async_setup_entry(
         """Refresh token proactively before Elion invalidates it."""
         try:
             await api.async_refresh_access_token()
+        except ElionAuthError as err:
+            _LOGGER.warning(
+                "Elion proactive token refresh failed, refresh token is no longer "
+                "valid, starting reauthentication: %s",
+                err,
+            )
+            entry.async_start_reauth(hass)
         except ElionApiError as err:
             _LOGGER.warning("Elion proactive token refresh failed: %s", err)
         else:

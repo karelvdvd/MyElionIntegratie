@@ -12,6 +12,14 @@
           "redirect_uri": "Redirect URI",
           "access_token": "Access token optioneel"
         }
+      },
+      "reauth_confirm": {
+        "title": "Elion herauthenticatie vereist",
+        "description": "De refresh token van deze Elion site werkt niet meer. Log in op het Elion dashboard, haal via de dev tools van je browser een nieuwe refresh token op en voer die hieronder in.",
+        "data": {
+          "refresh_token": "Refresh token",
+          "access_token": "Access token optioneel"
+        }
       }
     },
     "error": {
@@ -20,7 +28,8 @@
       "unknown": "Onverwachte fout."
     },
     "abort": {
-      "already_configured": "Deze Elion site is reeds geconfigureerd."
+      "already_configured": "Deze Elion site is reeds geconfigureerd.",
+      "reauth_successful": "Herauthenticatie geslaagd."
     }
   }
 }

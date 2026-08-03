@@ -98,3 +98,62 @@ class ElionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=data_schema,
             errors=errors,
         )
+
+    async def async_step_reauth(
+        self,
+        entry_data: dict,
+    ) -> config_entries.ConfigFlowResult:
+        """Handle reauthentication when the refresh token stops working."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self,
+        user_input: dict | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Ask the user for a fresh refresh token."""
+        errors: dict[str, str] = {}
+        reauth_entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            refresh_token = str(user_input[CONF_REFRESH_TOKEN]).strip()
+            access_token = str(user_input.get(CONF_ACCESS_TOKEN, "")).strip() or None
+
+            session = async_get_clientsession(self.hass)
+            api = ElionApi(
+                session=session,
+                site_id=reauth_entry.data[CONF_SITE_ID],
+                access_token=access_token,
+                refresh_token=refresh_token,
+                client_id=reauth_entry.data[CONF_CLIENT_ID],
+                token_url=reauth_entry.data[CONF_TOKEN_URL],
+                redirect_uri=reauth_entry.data.get(CONF_REDIRECT_URI) or None,
+            )
+
+            try:
+                await api.async_get_live()
+            except ElionAuthError:
+                errors["base"] = "invalid_auth"
+            except ElionApiError:
+                errors["base"] = "cannot_connect"
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Unexpected error while validating Elion reauth")
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data_updates={
+                        CONF_ACCESS_TOKEN: api.access_token or access_token or "",
+                        CONF_REFRESH_TOKEN: api.refresh_token or refresh_token,
+                    },
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_REFRESH_TOKEN): str,
+                    vol.Optional(CONF_ACCESS_TOKEN): str,
+                }
+            ),
+            errors=errors,
+        )
